@@ -1,10 +1,5 @@
-import { motion, type Variants } from "framer-motion";
-import type { ReactNode } from "react";
-
-const v: Variants = {
-  hidden: { opacity: 0, y: 28 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.2, 0.8, 0.2, 1] } },
-};
+import { motion, useInView, useMotionValue, useTransform, animate } from "framer-motion";
+import { useEffect, useRef, type ReactNode, type ElementType } from "react";
 
 export function Reveal({
   children,
@@ -15,16 +10,15 @@ export function Reveal({
   children: ReactNode;
   delay?: number;
   className?: string;
-  as?: keyof typeof motion;
+  as?: ElementType;
 }) {
-  const Comp = motion[Tag] as typeof motion.div;
+  const Comp = motion(Tag as ElementType) as typeof motion.div;
   return (
     <Comp
-      variants={v}
-      initial="hidden"
-      whileInView="show"
+      initial={{ opacity: 0, y: 28 }}
+      whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-80px" }}
-      transition={{ delay }}
+      transition={{ duration: 0.8, delay, ease: [0.2, 0.8, 0.2, 1] }}
       className={className}
     >
       {children}
@@ -33,39 +27,21 @@ export function Reveal({
 }
 
 export function Counter({ value, suffix = "" }: { value: number; suffix?: string }) {
-  return (
-    <motion.span
-      initial={{ opacity: 0 }}
-      whileInView={{ opacity: 1 }}
-      viewport={{ once: true }}
-      className="tabular-nums"
-    >
-      <motion.span
-        initial={{ "--n": 0 } as never}
-        whileInView={{ "--n": value } as never}
-        viewport={{ once: true, margin: "-100px" }}
-        transition={{ duration: 2.2, ease: [0.2, 0.8, 0.2, 1] }}
-        onUpdate={(latest: { [k: string]: number }) => {
-          const el = document.activeElement;
-          void el;
-          // no-op; visual handled by sibling text below
-        }}
-      />
-      <CountText to={value} />
-      {suffix}
-    </motion.span>
-  );
-}
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-80px" });
+  const count = useMotionValue(0);
+  const rounded = useTransform(count, (v) => Math.floor(v).toLocaleString());
 
-function CountText({ to }: { to: number }) {
+  useEffect(() => {
+    if (!inView) return;
+    const ctrl = animate(count, value, { duration: 2.2, ease: [0.2, 0.8, 0.2, 1] });
+    return () => ctrl.stop();
+  }, [inView, value, count]);
+
   return (
-    <motion.span
-      initial={{ count: 0 } as never}
-      whileInView={{ count: to } as never}
-      viewport={{ once: true, margin: "-100px" }}
-      transition={{ duration: 2, ease: [0.2, 0.8, 0.2, 1] }}
-    >
-      {(v) => Math.floor((v as unknown as { count: number }).count ?? 0).toLocaleString()}
-    </motion.span>
+    <span ref={ref} className="tabular-nums">
+      <motion.span>{rounded}</motion.span>
+      {suffix}
+    </span>
   );
 }
